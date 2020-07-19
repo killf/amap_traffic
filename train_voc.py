@@ -18,10 +18,9 @@ def collate_fn(batch):
     return result
 
 
-def fasterrcnn_resnet50_fpn(num_classes=2, pretrained=True, pretrained_backbone=True, trainable_backbone_layers=5):
+def fasterrcnn_resnet50_fpn(num_classes=2, pretrained=True, pretrained_backbone=True):
     model = faster_rcnn.fasterrcnn_resnet50_fpn(
         pretrained=pretrained,
-        trainable_backbone_layers=trainable_backbone_layers,
         pretrained_backbone=pretrained_backbone,
     )
     in_features = model.roi_heads.box_predictor.cls_score.in_features
