@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import DataLoader
-from torchvision.models.detection import faster_rcnn
+from torchvision.models.detection import fasterrcnn_resnet50_fpn
 import os
 
 from transforms.voc import Compose, CvtLabel, ToTensor
@@ -18,28 +18,17 @@ def collate_fn(batch):
     return result
 
 
-def fasterrcnn_resnet50_fpn(num_classes=2, pretrained=True, pretrained_backbone=True):
-    model = faster_rcnn.fasterrcnn_resnet50_fpn(
-        pretrained=pretrained,
-        pretrained_backbone=pretrained_backbone,
-    )
-    in_features = model.roi_heads.box_predictor.cls_score.in_features
-    model.roi_heads.box_predictor = faster_rcnn.FastRCNNPredictor(in_features, num_classes)
-    return model
-
-
 def main():
     transforms = Compose([CvtLabel(LABEL_NAMES), ToTensor()])
 
     train_set = VOCDetection(DATA_DIR, "train_list.txt", transforms=transforms)
     val_set = VOCDetection(DATA_DIR, "trainval.txt", transforms=transforms)
 
-    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
-                              collate_fn=collate_fn)
-    val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS, collate_fn=collate_fn)
+    train_loader = DataLoader(train_set, BATCH_SIZE, True, num_workers=NUM_WORKERS, collate_fn=collate_fn)
+    val_loader = DataLoader(val_set, BATCH_SIZE, num_workers=NUM_WORKERS, collate_fn=collate_fn)
 
     device = torch.device(0)
-    model = fasterrcnn_resnet50_fpn(num_classes=len(LABEL_NAMES), pretrained=True).to(device)
+    model = fasterrcnn_resnet50_fpn(num_classes=len(LABEL_NAMES)).to(device)
 
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.0005)
@@ -73,6 +62,10 @@ def main():
             target = [{n: item[n].to(device) for n in ['labels', 'boxes']} for item in target]
 
             pred = model(img)
+            for item in pred:
+                print(item["boxes"].shape, item['labels'].shape, item['scores'].shape)
+                pass
+
             pass
 
         lr_scheduler.step()
