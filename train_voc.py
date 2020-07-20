@@ -1,10 +1,10 @@
 import torch
 from torch.utils.data import DataLoader
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
+from torchvision.datasets import VOCDetection
 import os
 
 from transforms.voc import Compose, CvtLabel, ToTensor
-from data.voc import VOCDetection
 from config.voc import *
 
 LABEL_NAMES = ['__background__', 'car', 'bus', 'van', 'others']
@@ -21,8 +21,8 @@ def collate_fn(batch):
 def main():
     transforms = Compose([CvtLabel(LABEL_NAMES), ToTensor()])
 
-    train_set = VOCDetection(DATA_DIR, "train", transforms=transforms)
-    val_set = VOCDetection(DATA_DIR, "trainval", transforms=transforms)
+    train_set = VOCDetection(DATA_DIR, 'UA-DETRAC', "train", transforms=transforms)
+    val_set = VOCDetection(DATA_DIR, 'UA-DETRAC', "trainval", transforms=transforms)
 
     train_loader = DataLoader(train_set, BATCH_SIZE, True, num_workers=NUM_WORKERS, collate_fn=collate_fn)
     val_loader = DataLoader(val_set, BATCH_SIZE, num_workers=NUM_WORKERS, collate_fn=collate_fn)
