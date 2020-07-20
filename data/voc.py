@@ -16,23 +16,27 @@ __ALL__ = ["VOCDetection"]
 class VOCDetection(VisionDataset):
     def __init__(self,
                  root,
-                 file,
+                 image_set,
                  transform=None,
                  target_transform=None,
                  transforms=None):
         super(VOCDetection, self).__init__(root, transforms, transform, target_transform)
 
+        image_dir = os.path.join(root, 'JPEGImages')
+        annotation_dir = os.path.join(root, 'Annotations')
+
         if not os.path.isdir(root):
             raise RuntimeError('Dataset not found or corrupted.' +
                                ' You can use download=True to download it')
 
-        self.images, self.annotations = [], []
-        with open(os.path.join(root, file), "r") as f:
-            for line in f.readlines():
-                ss = line.strip().split(" ")
-                self.images.append(os.path.join(root, ss[0]))
-                self.annotations.append(os.path.join(root, ss[1]))
+        splits_dir = os.path.join(root, 'ImageSets/Main')
 
+        split_f = os.path.join(splits_dir, image_set.rstrip('\n') + '.txt')
+        with open(os.path.join(split_f), "r") as f:
+            file_names = [x.strip() for x in f.readlines()]
+
+        self.images = [os.path.join(image_dir, x + ".jpg") for x in file_names]
+        self.annotations = [os.path.join(annotation_dir, x + ".xml") for x in file_names]
         assert (len(self.images) == len(self.annotations))
 
     def __getitem__(self, index):

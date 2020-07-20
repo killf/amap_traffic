@@ -21,8 +21,8 @@ def collate_fn(batch):
 def main():
     transforms = Compose([CvtLabel(LABEL_NAMES), ToTensor()])
 
-    train_set = VOCDetection(DATA_DIR, "train_list.txt", transforms=transforms)
-    val_set = VOCDetection(DATA_DIR, "trainval.txt", transforms=transforms)
+    train_set = VOCDetection(DATA_DIR, "train", transforms=transforms)
+    val_set = VOCDetection(DATA_DIR, "trainval", transforms=transforms)
 
     train_loader = DataLoader(train_set, BATCH_SIZE, True, num_workers=NUM_WORKERS, collate_fn=collate_fn)
     val_loader = DataLoader(val_set, BATCH_SIZE, num_workers=NUM_WORKERS, collate_fn=collate_fn)
@@ -35,8 +35,7 @@ def main():
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 
     if os.path.exists(MODEL_FILE):
-        state_dict, _ = torch.load(MODEL_FILE)
-        model.load_state_dict(state_dict)
+        model.load_state_dict(torch.load(MODEL_FILE))
 
     for epoch in range(1, EPOCHS + 1):
         model.train()
@@ -54,7 +53,7 @@ def main():
             optimizer.step()
 
             loss = losses.cpu().detach().numpy()
-            print(f"Epoch:{epoch}/{EPOCHS + 1}, Step:{step}/{total_step}, Loss={loss:.04f}")
+            print(f"Epoch:{epoch}/{EPOCHS}, Step:{step}/{total_step}, Loss={loss:.04f}", end='\r', flush=True)
 
         # model.eval()
         # with torch.no_grad():
