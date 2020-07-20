@@ -27,7 +27,7 @@ def main():
     train_loader = DataLoader(train_set, BATCH_SIZE, True, num_workers=NUM_WORKERS, collate_fn=collate_fn)
     val_loader = DataLoader(val_set, BATCH_SIZE, num_workers=NUM_WORKERS, collate_fn=collate_fn)
 
-    device = torch.device(0)
+    device = torch.device(DEVICE)
     model = fasterrcnn_resnet50_fpn(num_classes=len(LABEL_NAMES)).to(device)
 
     params = [p for p in model.parameters() if p.requires_grad]

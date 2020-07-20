@@ -16,3 +16,4 @@ os.makedirs(os.path.dirname(MODEL_FILE), exist_ok=True)
 EPOCHS = 200
 BATCH_SIZE = 4
 NUM_WORKERS = 7
+DEVICE = 0
