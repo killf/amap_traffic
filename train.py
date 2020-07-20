@@ -10,6 +10,13 @@ from data.amap import AmapDataset
 from config.amap import *
 
 
+def create_model(num_classes=1, pretrained=True):
+    model = resnet101(pretrained=pretrained)
+    in_features = model.fc.in_features
+    model.fc = nn.Linear(in_features, num_classes)
+    return model
+
+
 def main():
     transforms = Compose([Resize((640, 320)), ToTensor()])
 
@@ -17,7 +24,7 @@ def main():
     train_loader = DataLoader(train_dataset, BATCH_SIZE, True, num_workers=NUM_WORKERS)
 
     device = torch.device(DEVICE)
-    model = resnet101(num_classes=1).to(device)
+    model = create_model(num_classes=1).to(device)
     loss_fn = nn.MSELoss()
 
     params = [p for p in model.parameters() if p.requires_grad]
