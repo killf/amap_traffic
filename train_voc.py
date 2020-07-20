@@ -56,20 +56,22 @@ def main():
             loss = losses.cpu().detach().numpy()
             print(f"Epoch:{epoch}/{EPOCHS + 1}, Step:{step}/{total_step}, Loss={loss:.04f}")
 
-        model.eval()
-        for img, target in val_loader:
-            img = [i.to(device) for i in img]
-            target = [{n: item[n].to(device) for n in ['labels', 'boxes']} for item in target]
-
-            pred = model(img)
-            for item in pred:
-                print(item["boxes"].shape, item['labels'].shape, item['scores'].shape)
-                pass
-
-            pass
+        # model.eval()
+        # with torch.no_grad():
+        #     for img, target in val_loader:
+        #         img = [i.to(device) for i in img]
+        #         target = [{n: item[n].to(device) for n in ['labels', 'boxes']} for item in target]
+        #
+        #         pred = model(img)
+        #         for item in pred:
+        #             print(item["boxes"].shape, item['labels'].shape, item['scores'].shape)
+        #             pass
+        #
+        #         pass
 
         lr_scheduler.step()
         torch.save(model.state_dict(), MODEL_FILE)
+        print()
 
     pass
 
