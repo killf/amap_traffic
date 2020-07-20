@@ -10,7 +10,7 @@ from data.amap import AmapDataset
 from config.amap import *
 
 
-def create_model(num_classes=1, pretrained=True):
+def create_model(num_classes=3, pretrained=True):
     model = resnet101(pretrained=pretrained)
     in_features = model.fc.in_features
     model.fc = nn.Linear(in_features, num_classes)
@@ -24,8 +24,8 @@ def main():
     train_loader = DataLoader(train_dataset, BATCH_SIZE, True, num_workers=NUM_WORKERS)
 
     device = torch.device(DEVICE)
-    model = create_model(num_classes=1).to(device)
-    loss_fn = nn.MSELoss()
+    model = create_model(num_classes=3).to(device)
+    loss_fn = nn.CrossEntropyLoss()
 
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.0005)
@@ -37,24 +37,27 @@ def main():
     for epoch in range(1, EPOCHS + 1):
         model.train()
 
-        all_loss = []
-        for step, (img, score, is_key) in enumerate(train_loader):
+        all_loss, all_acc = [], []
+        for step, (img, label, is_key) in enumerate(train_loader):
             step, total_step = step + 1, len(train_loader)
-            img, score = img.to(device), score.to(device).type(torch.float32)
+            img, label = img.to(device), label.to(device)
 
             pred = model(img)
-            pred = torch.sigmoid(pred).squeeze()
-
-            losses = loss_fn(pred, score)
+            losses = loss_fn(pred, label)
 
             optimizer.zero_grad()
             losses.backward()
             optimizer.step()
 
+            pred = torch.argmax(pred, 1)
+            acc = (pred == label).float().mean().cpu().detach().numpy()
             loss = losses.cpu().detach().numpy()
+
             all_loss.append(loss)
-            mean_loss = np.mean(all_loss)
-            print(f"Epoch:{epoch}/{EPOCHS}, Step:{step}/{total_step}, Loss:{loss:.04f}, Mean Loss:{mean_loss:.04f}",
+            all_acc.append(acc)
+            print(f"Epoch:{epoch}/{EPOCHS}, Step:{step}/{total_step}, "
+                  f"Loss:{loss:.04f}/{np.mean(all_loss):.04f}, "
+                  f"Accuracy:{acc:0.4f}/{np.mean(all_acc):.04f}",
                   end='\r', flush=True)
 
         lr_scheduler.step()

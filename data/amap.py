@@ -12,10 +12,7 @@ class AmapDataset(Dataset):
         self.image_folder = os.path.join(root, f"amap_traffic_{stage}_0712")
         self.annotations_file = os.path.join(root, f"amap_traffic_annotations_{stage}.json")
         self.transforms = transforms
-
         self.target_transforms = target_transforms
-        if self.target_transforms is None:
-            self.target_transforms = lambda x: float(x) / 2
 
         annotations = json.load(open(self.annotations_file, encoding='utf8'))
 
