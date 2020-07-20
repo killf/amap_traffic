@@ -65,5 +65,26 @@ def main():
         print()
 
 
+def test():
+    transforms = Compose([Resize((640, 320)), ToTensor()])
+
+    test_dataset = AmapDataset(DATA_DIR, "test", transforms=transforms)
+    test_loader = DataLoader(test_dataset, BATCH_SIZE)
+
+    device = torch.device(DEVICE)
+    model = create_model(num_classes=3, pretrained=False).to(device)
+    model.load_state_dict(torch.load(MODEL_FILE))
+
+    model.eval()
+    with torch.no_grad():
+        for idx, img, is_key in test_loader:
+            img = img.to(device)
+            pred = model(img)
+            pred = torch.argmax(pred, 1)
+            print(pred)
+            pass
+
+
 if __name__ == '__main__':
-    main()
+    # main()
+    test()

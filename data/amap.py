@@ -13,6 +13,7 @@ class AmapDataset(Dataset):
         self.annotations_file = os.path.join(root, f"amap_traffic_annotations_{stage}.json")
         self.transforms = transforms
         self.target_transforms = target_transforms
+        self.is_test = stage == "test"
 
         annotations = json.load(open(self.annotations_file, encoding='utf8'))
 
@@ -40,7 +41,10 @@ class AmapDataset(Dataset):
         if self.target_transforms:
             status = self.target_transforms(status)
 
-        return image, status, is_key
+        if self.is_test:
+            return idx, image, is_key
+        else:
+            return image, status, is_key
 
 
 if __name__ == '__main__':
