@@ -77,12 +77,20 @@ def test():
 
     model.eval()
     with torch.no_grad():
+        idx_ls, is_key_ls, pred_ls = [], [], []
         for idx, img, is_key in test_loader:
             img = img.to(device)
             pred = model(img)
-            pred = torch.argmax(pred, 1)
-            print(pred)
-            pass
+            pred = torch.argmax(pred, 1).cpu().numpy()
+            idx_ls.append(idx)
+            is_key_ls.append(is_key.numpy())
+            pred_ls.append(pred)
+
+        idx_ls = np.stack(idx_ls)
+        is_key_ls = np.stack(is_key_ls)
+        pred_ls = np.stack(pred_ls)
+
+        pass
 
 
 if __name__ == '__main__':
