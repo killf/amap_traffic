@@ -2,12 +2,14 @@ import torch
 from torch.utils.data import Dataset
 from PIL import Image
 
+import collections
+import random
 import json
 import os
 
 
 class AmapDataset(Dataset):
-    def __init__(self, root, stage="train", transforms=None, target_transforms=None):
+    def __init__(self, root, stage="train", shuffle=False, transforms=None, target_transforms=None):
         self.root = root
         self.image_folder = os.path.join(root, f"amap_traffic_{stage}_0712")
         self.annotations_file = os.path.join(root, f"amap_traffic_annotations_{stage}.json")
@@ -24,7 +26,14 @@ class AmapDataset(Dataset):
                 frame_name = frame["frame_name"]
                 all_frames.append((idx, frame_name, frame_name == key_frame, status))
 
+        if shuffle:
+            random.shuffle(all_frames)
+
         self.all_frames = all_frames
+
+        counter = collections.Counter([item[3] for item in all_frames])
+        weights = {key: len(all_frames) / value for key, value in counter.items()}
+        self.sampler_weights = [weights[item[3]] for item in all_frames]
 
     def __len__(self):
         return len(self.all_frames)
