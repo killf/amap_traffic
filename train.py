@@ -1,3 +1,5 @@
+import json
+
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
@@ -86,11 +88,21 @@ def test():
             is_key_ls.append(is_key.numpy())
             pred_ls.append(pred)
 
-        idx_ls = np.stack(idx_ls)
-        is_key_ls = np.stack(is_key_ls)
-        pred_ls = np.stack(pred_ls)
+        idx_ls = np.concatenate(idx_ls, axis=0)
+        is_key_ls = np.concatenate(is_key_ls, axis=0)
+        pred_ls = np.concatenate(pred_ls, axis=0)
 
-        pass
+    pred_dict = dict()
+    for idx, is_key, pred in zip(idx_ls, is_key_ls, pred_ls):
+        if not is_key:
+            continue
+        pred_dict[idx] = pred
+
+    annotations = json.load(open(os.path.join(DATA_DIR, "amap_traffic_annotations_test.json")))
+    for item in annotations["annotations"]:
+        item['status'] = int(pred_dict[item["id"]])
+
+    json.dump(annotations, open("result.json", "w", encoding="utf8"))
 
 
 if __name__ == '__main__':
