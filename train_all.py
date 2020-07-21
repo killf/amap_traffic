@@ -69,8 +69,8 @@ def main():
     params = [p for p in detector.parameters() if p.requires_grad]
     params += [p for p in classifier.parameters() if p.requires_grad]
 
-    optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.0005)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+    optimizer = torch.optim.Adam(params, lr=0.0005, weight_decay=0.0005)
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 5, 5e-6)
 
     best_acc = 0
     for epoch in range(1, amap.EPOCHS + 1):
