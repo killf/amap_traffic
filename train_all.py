@@ -140,5 +140,45 @@ def main():
         lr_scheduler.step()
 
 
+def test():
+    transforms = Compose([Resize((640, 320)), ToTensor()])
+
+    test_dataset = AmapDataset(amap.DATA_DIR, "test", transforms=transforms)
+    test_loader = DataLoader(test_dataset, amap.BATCH_SIZE)
+
+    device = torch.device(amap.DEVICE)
+    detector, classifier = create_model(num_classes=3, pretrained=False)
+    model = classifier.to(device)
+    model.load_state_dict(torch.load(amap.MODEL_FILE))
+
+    model.eval()
+    with torch.no_grad():
+        idx_ls, is_key_ls, pred_ls = [], [], []
+        for idx, img, is_key in test_loader:
+            img = img.to(device)
+            pred = model(img)
+            pred = torch.argmax(pred, 1).cpu().numpy()
+            idx_ls.append(idx)
+            is_key_ls.append(is_key.numpy())
+            pred_ls.append(pred)
+
+        idx_ls = np.concatenate(idx_ls, axis=0)
+        is_key_ls = np.concatenate(is_key_ls, axis=0)
+        pred_ls = np.concatenate(pred_ls, axis=0)
+
+    pred_dict = dict()
+    for idx, is_key, pred in zip(idx_ls, is_key_ls, pred_ls):
+        if not is_key:
+            continue
+        pred_dict[idx] = pred
+
+    annotations = json.load(open(os.path.join(amap.DATA_DIR, "amap_traffic_annotations_test.json")))
+    for item in annotations["annotations"]:
+        item['status'] = int(pred_dict[item["id"]])
+
+    json.dump(annotations, open("result.json", "w", encoding="utf8"))
+
+
 if __name__ == '__main__':
-    main()
+    # main()
+    test()
