@@ -21,10 +21,14 @@ LABEL_NAMES = ['__background__', 'car', 'bus', 'van', 'others']
 
 def create_model(num_classes=3, pretrained=True):
     backbone = resnet50(pretrained=True)
-    classifier = SimpleClassifier(num_classes, backbone)
+    for name, parameter in backbone.named_parameters():
+        if 'layer2' not in name and 'layer3' not in name and 'layer4' not in name:
+            parameter.requires_grad_(False)
 
     backbone_fpn = resnet_fpn_backbone(backbone)
     detector = FasterRCNN(backbone_fpn, len(LABEL_NAMES))
+
+    classifier = SimpleClassifier(num_classes, backbone)
 
     return detector, classifier
 
@@ -74,7 +78,7 @@ def main():
         classifier.train()
         counter, step = Counter(), 0
         for step, (voc_data, amap_data) in enumerate(zip(voc_train_loader, amap_train_loader)):
-            step = step + 1
+            step, total_step = step + 1, min(len(voc_train_loader), len(amap_train_loader))
 
             img, target = voc_data
             img = [i.to(device) for i in img]
@@ -84,9 +88,13 @@ def main():
             voc_loss = sum(loss for loss in voc_loss_dict.values())
 
             img, label, is_key = amap_data
-            img, label = img.to(device), label.to(device)
+            img, label, is_key = img.to(device), label.to(device), is_key.to(device)
             amap_pred = classifier(img)
-            amap_loss = F.cross_entropy(amap_pred, label)
+            amap_loss = F.cross_entropy(amap_pred, label, reduction="none")
+
+            loss_weight = (is_key.float() + 1) / 2
+            loss_weight = loss_weight / torch.sum(loss_weight)
+            amap_loss = torch.dot(amap_loss, loss_weight)
 
             optimizer.zero_grad()
             voc_loss.backward()
@@ -100,7 +108,7 @@ def main():
             amap_loss = amap_loss.cpu().detach().numpy()
 
             counter.append(voc_loss=voc_loss, amap_loss=amap_loss, amap_acc=amap_acc)
-            print(f"Epoch:{epoch}/{amap.EPOCHS}, Step:{step}/{len(voc_train_loader)}, "
+            print(f"Epoch:{epoch}/{amap.EPOCHS}, Step:{step}/{total_step}, "
                   f"Detector Loss:{voc_loss:.04f}/{counter.voc_loss:.04f}, "
                   f"Classifier Loss:{amap_loss:.04f}/{counter.amap_loss:.04f}, "
                   f"Classifier Accuracy:{amap_acc:0.4f}/{counter.amap_acc:.04f}",
@@ -127,6 +135,7 @@ def main():
         if best_acc < val_acc:
             best_acc = val_acc
             torch.save(classifier.state_dict(), amap.MODEL_FILE)
+            torch.save(detector.state_dict(), voc.MODEL_FILE)
 
         lr_scheduler.step()
 

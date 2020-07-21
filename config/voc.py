@@ -9,7 +9,7 @@ voc.DATASET_YEAR_DICT['UA-DETRAC'] = {
 }
 
 DATA_DIR = "/home/killf/dataset/amap_traffic/UA-DETRAC交通车辆数据集"
-MODEL_FILE = "result/model.pth"
+MODEL_FILE = "result/detector.pth"
 
 os.makedirs(os.path.dirname(MODEL_FILE), exist_ok=True)
 
