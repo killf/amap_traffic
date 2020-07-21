@@ -14,6 +14,6 @@ MODEL_FILE = "result/model.pth"
 os.makedirs(os.path.dirname(MODEL_FILE), exist_ok=True)
 
 EPOCHS = 200
-BATCH_SIZE = 4
-NUM_WORKERS = 7
+BATCH_SIZE = 2
+NUM_WORKERS = 2
 DEVICE = 0

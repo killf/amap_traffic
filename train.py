@@ -3,13 +3,13 @@ import json
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, WeightedRandomSampler
-from torchvision.transforms import ToTensor, Compose, Resize, RandomHorizontalFlip, RandomCrop
 from torchvision.models import resnet101
+from torchvision.transforms import *
 import numpy as np
 import os
 
 from data.amap import AmapDataset
-from utils import Counter, Timer
+from utils import Counter
 from config.amap import *
 
 
@@ -21,14 +21,14 @@ def create_model(num_classes=3, pretrained=True):
 
 
 def main():
-    train_transforms = Compose([Resize((640, 320)), RandomHorizontalFlip(), RandomCrop((640, 320), 20), ToTensor()])
+    train_transforms = Compose(
+        [Resize((640, 320)), RandomHorizontalFlip(), RandomGrayscale(), RandomCrop((640, 320), 20), ToTensor()])
     val_transforms = Compose([Resize((640, 320)), ToTensor()])
 
-    train_dataset = AmapDataset(DATA_DIR, "train", True, transforms=train_transforms)
+    train_dataset = AmapDataset(DATA_DIR, "train", transforms=train_transforms)
     val_dataset = AmapDataset(DATA_DIR, "trainval", transforms=val_transforms)
 
-    train_loader = DataLoader(train_dataset, BATCH_SIZE, num_workers=NUM_WORKERS,
-                              sampler=WeightedRandomSampler(train_dataset.sampler_weights, len(train_dataset) // 2))
+    train_loader = DataLoader(train_dataset, BATCH_SIZE, True, num_workers=NUM_WORKERS)
     val_loader = DataLoader(val_dataset, BATCH_SIZE, num_workers=NUM_WORKERS)
 
     device = torch.device(DEVICE)
@@ -37,7 +37,7 @@ def main():
 
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.0005)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
     if os.path.exists(MODEL_FILE):
         model.load_state_dict(torch.load(MODEL_FILE))

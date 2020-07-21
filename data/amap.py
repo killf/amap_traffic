@@ -24,6 +24,8 @@ class AmapDataset(Dataset):
             idx, key_frame, status = item["id"], item["key_frame"], item["status"]
             for frame in item["frames"]:
                 frame_name = frame["frame_name"]
+                if stage == "trainval" and frame_name != key_frame:
+                    continue
                 all_frames.append((idx, frame_name, frame_name == key_frame, status))
 
         if shuffle:
