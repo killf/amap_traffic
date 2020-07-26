@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-from torchvision.models import resnet101
+from torchvision.models import resnet101, resnet50, resnet34
 from torchvision.transforms import *
 import numpy as np
 import json
@@ -13,7 +13,7 @@ from config.amap import *
 
 
 def create_model(num_classes=3, pretrained=True):
-    model = resnet101(pretrained=pretrained)
+    model = resnet34(pretrained=pretrained)
     in_features = model.fc.in_features
     model.fc = nn.Linear(in_features, num_classes)
     return model
@@ -29,8 +29,8 @@ def main():
     model = create_model(num_classes=3).to(device)
 
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.0005)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
+    optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.005)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
     if os.path.exists(MODEL_FILE):
         model.load_state_dict(torch.load(MODEL_FILE))
@@ -110,5 +110,5 @@ def test():
 
 
 if __name__ == '__main__':
-    main()
-    # test()
+    # main()
+    test()
