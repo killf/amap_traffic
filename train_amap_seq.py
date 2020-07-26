@@ -105,5 +105,36 @@ def main():
         print()
 
 
+def test():
+    transforms = Compose([Resize((640, 320)), ToTensor()])
+
+    test_dataset = AmapDataset(DATA_DIR, "test", transforms=transforms)
+    test_loader = DataLoader(test_dataset, BATCH_SIZE, collate_fn=collate_fn)
+
+    device = torch.device(DEVICE)
+    model = MyModule(num_classes=3, pretrained=False).to(device)
+    model.load_state_dict(torch.load(MODEL_FILE))
+
+    model.eval()
+    with torch.no_grad():
+        pred_dict = {}
+        for idx, img in test_loader:
+            img = img.to(device)
+            pred = model(img)
+            pred = torch.argmax(pred, 1).cpu().numpy()
+
+            for idx_, pred_ in zip(idx, pred):
+                idx_ = str(idx_)
+                pred_ = int(pred_)
+                pred_dict[idx_] = pred_
+
+    annotations = json.load(open(os.path.join(DATA_DIR, "amap_traffic_annotations_test.json")))
+    for item in annotations["annotations"]:
+        item['status'] = int(pred_dict[item["id"]])
+
+    json.dump(annotations, open("result.json", "w", encoding="utf8"))
+
+
 if __name__ == '__main__':
-    main()
+    # main()
+    test()
