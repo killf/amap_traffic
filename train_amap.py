@@ -1,11 +1,10 @@
-import json
-
 import torch
 from torch import nn
-from torch.utils.data import DataLoader, WeightedRandomSampler
-from torchvision.models import resnet101
+from torch.utils.data import DataLoader
+from torchvision.models import resnet101, resnet50, resnet34
 from torchvision.transforms import *
 import numpy as np
+import json
 import os
 
 from data.amap import AmapDataset
@@ -14,29 +13,23 @@ from config.amap import *
 
 
 def create_model(num_classes=3, pretrained=True):
-    model = resnet101(pretrained=pretrained)
+    model = resnet34(pretrained=pretrained)
     in_features = model.fc.in_features
     model.fc = nn.Linear(in_features, num_classes)
     return model
 
 
 def main():
-    train_transforms = Compose(
-        [Resize((640, 320)), RandomHorizontalFlip(), RandomGrayscale(), RandomCrop((640, 320), 20), ToTensor()])
-    val_transforms = Compose([Resize((640, 320)), ToTensor()])
-
+    train_transforms = Compose([Resize((640, 320)), RandomHorizontalFlip(), RandomGrayscale(),
+                                RandomCrop((640, 320), 20), ToTensor()])
     train_dataset = AmapDataset(DATA_DIR, "train", transforms=train_transforms)
-    val_dataset = AmapDataset(DATA_DIR, "trainval", transforms=val_transforms)
-
     train_loader = DataLoader(train_dataset, BATCH_SIZE, True, num_workers=NUM_WORKERS)
-    val_loader = DataLoader(val_dataset, BATCH_SIZE, num_workers=NUM_WORKERS)
 
     device = torch.device(DEVICE)
     model = create_model(num_classes=3).to(device)
-    loss_fn = nn.CrossEntropyLoss()
 
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.0005)
+    optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.005)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
 
     if os.path.exists(MODEL_FILE):
@@ -48,18 +41,22 @@ def main():
         counter = Counter()
         for step, (img, label, is_key) in enumerate(train_loader):
             step, total_step = step + 1, len(train_loader)
-            img, label = img.to(device), label.to(device)
+            img, label, is_key = img.to(device), label.to(device), is_key.to(device)
 
             pred = model(img)
-            losses = loss_fn(pred, label)
+
+            loss = nn.functional.cross_entropy(pred, label, reduction="none")
+            loss_weight = (is_key.float() + 1) / 2
+            loss_weight = loss_weight / torch.sum(loss_weight)
+            loss = torch.dot(loss, loss_weight)
 
             optimizer.zero_grad()
-            losses.backward()
+            loss.backward()
             optimizer.step()
 
             pred = torch.argmax(pred, 1)
             acc = (pred == label).float().mean().cpu().detach().numpy()
-            loss = losses.cpu().detach().numpy()
+            loss = loss.cpu().detach().numpy()
 
             counter.append(loss=loss, acc=acc)
             print(f"Epoch:{epoch}/{EPOCHS}, Step:{step}/{total_step}, "
@@ -67,29 +64,10 @@ def main():
                   f"Accuracy:{acc:0.4f}/{counter.acc:.04f}",
                   end='\r', flush=True)
 
-        model.eval()
-        counter = Counter()
-        with torch.no_grad():
-            for img, label, is_key in val_loader:
-                img, label = img.to(device), label.to(device)
-
-                pred = model(img)
-                losses = loss_fn(pred, label)
-
-                pred = torch.argmax(pred, 1)
-                acc = (pred == label).float().mean().cpu().detach().numpy()
-                loss = losses.cpu().detach().numpy()
-
-                counter.append(loss=loss, acc=acc)
-
-        val_acc, val_loss = counter.acc, counter.loss
-        print(f"\nVal Loss:{val_loss:.04f} Acc:{val_acc:.04f}\n")
-
-        if best_acc < val_acc:
-            best_acc = val_acc
-            torch.save(model.state_dict(), MODEL_FILE)
-
+        torch.save(model.state_dict(), MODEL_FILE)
         lr_scheduler.step()
+        print()
+
     print(f"Best Acc:{best_acc:.04f}")
 
 
