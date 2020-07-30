@@ -7,3 +7,10 @@
 注意，采样时间是不同的
 
 参考 https://github.com/Cyclocosmia-ricketti/correlation-layer
+
+输入两张图片和时间 输出速度
+输入两张图片 
+IMG1 + IMG2 -> S / T -> LABEL
+
+根据车速判断:拥堵 缓行 畅通
+[h,w] 
