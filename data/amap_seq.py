@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 from PIL import Image
+import numpy as np
 
 import collections
 import random
@@ -29,12 +30,13 @@ class AmapDataset(Dataset):
     def __getitem__(self, index):
         annotation = self.annotations[index]
 
-        idx, status, images = annotation["id"], annotation["status"], []
+        idx, status, images, times = annotation["id"], annotation["status"], [], []
         for frame in annotation["frames"]:
-            frame_name = frame["frame_name"]
+            frame_name, gps_time = frame["frame_name"], frame["gps_time"]
             image_file = os.path.join(self.image_folder, str(idx), frame_name)
             image = Image.open(image_file)
             images.append(image)
+            times.append(torch.tensor(gps_time, dtype=torch.int32))
 
         if self.transforms:
             images = self.transforms(images)
@@ -43,9 +45,9 @@ class AmapDataset(Dataset):
             status = self.target_transforms(status)
 
         if self.is_test:
-            return idx, images
+            return idx, images, times
         else:
-            return idx, images, status
+            return idx, images, times, status
 
 
 if __name__ == '__main__':

@@ -11,7 +11,7 @@ from models import resnet34, resnet50
 from utils import Counter
 from config.amap import *
 
-MODEL_FILE = "amap_seq"
+MODEL_FILE = "result/amap_seq.pth"
 NUM_WORKERS = 0
 BATCH_SIZE = 1
 
@@ -21,20 +21,91 @@ class MyModule(nn.Module):
         super(MyModule, self).__init__()
         self.feature = resnet50(pretrained=True)
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.lstm = nn.LSTM(2048, 256, bidirectional=True, batch_first=True)
-        self.classifier = nn.Linear(256, num_classes)
+        self.lstm = nn.LSTM(2048, 256, num_layers=2, bidirectional=True, batch_first=True)
+        self.classifier = nn.Linear(512, num_classes)
 
-    def forward(self, x):
+    def forward(self, x, t):
         x = self.feature(x)
-        x = self.avg_pool(x)
 
+        # 计算中心位置
+        # hs, ws = int(x.size(2)), int(x.size(3))
+        # h, w = torch.clone(x), torch.clone(x)
+        # for i in range(hs):
+        #     h[:, :, i, :] *= i / hs
+        # for i in range(ws):
+        #     w[:, :, :, i] *= i / ws
+        # h, w = torch.mean(h, [2, 3]), torch.mean(w, [2, 3])
+        #
+        # x = self.avg_pool(x)
+        # x = torch.flatten(x, 1)
+        #
+        # x = torch.cat([x, h, w], 1)
+        x = self.avg_pool(x)
         x = torch.flatten(x, 1)
         x = torch.unsqueeze(x, 0)
 
         x, (h_n, c_n) = self.lstm(x)
 
-        x = h_n[-1, :, :]
+        x = x[:, -1, :]
+        x = self.classifier(x)
+        return x
 
+    def forward2(self, x, t):
+        x = self.feature(x)
+
+        # 计算中心位置和大小
+        hs, ws = int(x.size(2)), int(x.size(3))
+        h, w = torch.clone(x), torch.clone(x)
+        for i in range(hs):
+            h[:, :, i, :] *= i / hs
+        for i in range(ws):
+            w[:, :, :, i] *= i / ws
+        h, w = torch.mean(h, [2, 3]), torch.mean(w, [2, 3])
+
+        dh = torch.empty(h.size(0) - 1, h.size(1), dtype=h.dtype)
+        for i in range(dh.size(0)):
+            dh[i, :] = h[i + 1, :] - h[i, :]
+
+        dw = torch.empty(w.size(0) - 1, w.size(1), dtype=w.dtype)
+        for i in range(dw.size(0)):
+            dw[i, :] = w[i + 1, :] - w[i, :]
+
+        dt = torch.empty(t.size(0) - 1, dtype=torch.float32)
+        for i in range(dt.size(0)):
+            dt[i] = t[i + 1] - t[i]
+        dt = torch.unsqueeze(dt, -1)
+
+        dh = dh / dt
+        dw = dw / dt
+        ds = torch.sqrt(dh * dh + dw * dw).to(x.device)
+
+        x = torch.unsqueeze(ds, 0)
+        x, (h_n, c_n) = self.lstm(x)
+        x = torch.relu(x)
+
+        x = x[:, -1, :]
+        x = self.classifier(x)
+        return x
+
+    def forward3(self, x, t):
+        x = self.feature(x)
+
+        dx = torch.empty(x.size(0) - 1, x.size(1), x.size(2), x.size(3), dtype=x.dtype)
+        for i in range(dx.size(0)):
+            dx[i, :] = x[i + 1, :, :, :] - x[i, :, :, :]
+
+        dt = torch.empty(t.size(0) - 1, dtype=torch.float32)
+        for i in range(dt.size(0)):
+            dt[i] = t[i + 1] - t[i]
+        dt = torch.unsqueeze(dt, -1)
+
+        x = self.avg_pool(dx.to(x.device))
+        x = torch.flatten(x, 1)
+        x = torch.unsqueeze(x, 0)
+        x, (h_n, c_n) = self.lstm(x)
+        x = torch.relu(x)
+
+        x = x[:, -1, :]
         x = self.classifier(x)
         return x
 
@@ -53,8 +124,9 @@ def collate_fn(inputs):
 
     result[0] = np.array(result[0])
     result[1] = result[1][0]
-    if size > 2:
-        result[2] = torch.tensor(result[2])
+    result[2] = result[2][0]
+    if size > 3:
+        result[3] = torch.tensor(result[3])
 
     return result
 
@@ -78,16 +150,17 @@ def main():
     for epoch in range(1, EPOCHS + 1):
         model.train()
         counter = Counter()
-        for step, (idx, img, label) in enumerate(train_loader):
+        for step, (idx, img, times, label) in enumerate(train_loader):
             step, total_step = step + 1, len(train_loader)
-            img, label = img.to(device), label.to(device)
+            img, times, label = img.to(device), times.to(device), label.to(device)
 
-            pred = model(img)
+            pred = model(img, times)
 
             loss = nn.functional.cross_entropy(pred, label)
 
             optimizer.zero_grad()
             loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=10, norm_type=2)
             optimizer.step()
 
             pred = torch.argmax(pred, 1)
@@ -118,7 +191,7 @@ def test():
     model.eval()
     with torch.no_grad():
         pred_dict = {}
-        for idx, img in test_loader:
+        for idx, img, times in test_loader:
             img = img.to(device)
             pred = model(img)
             pred = torch.argmax(pred, 1).cpu().numpy()
@@ -136,5 +209,5 @@ def test():
 
 
 if __name__ == '__main__':
-    # main()
-    test()
+    main()
+    # test()
