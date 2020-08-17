@@ -21,25 +21,16 @@ class MyModule(nn.Module):
         super(MyModule, self).__init__()
         self.feature = resnet50(pretrained=True)
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.lstm = nn.LSTM(2048, 256, num_layers=2, bidirectional=True, batch_first=True)
+        self.lstm = nn.LSTM(512, 256, num_layers=2, bidirectional=True, batch_first=True)
         self.classifier = nn.Linear(512, num_classes)
 
-    def forward(self, x, t):
+        self.conv3d_1 = nn.Conv3d(2048, 1024, 3, padding=1)
+        self.conv3d_2 = nn.Conv3d(1024, 512, 3, padding=1)
+        self.avg_pool_3d = nn.AdaptiveAvgPool3d((1, 1, 1))
+
+    def forward1(self, x, t):
         x = self.feature(x)
 
-        # 计算中心位置
-        # hs, ws = int(x.size(2)), int(x.size(3))
-        # h, w = torch.clone(x), torch.clone(x)
-        # for i in range(hs):
-        #     h[:, :, i, :] *= i / hs
-        # for i in range(ws):
-        #     w[:, :, :, i] *= i / ws
-        # h, w = torch.mean(h, [2, 3]), torch.mean(w, [2, 3])
-        #
-        # x = self.avg_pool(x)
-        # x = torch.flatten(x, 1)
-        #
-        # x = torch.cat([x, h, w], 1)
         x = self.avg_pool(x)
         x = torch.flatten(x, 1)
         x = torch.unsqueeze(x, 0)
@@ -81,7 +72,6 @@ class MyModule(nn.Module):
 
         x = torch.unsqueeze(ds, 0)
         x, (h_n, c_n) = self.lstm(x)
-        x = torch.relu(x)
 
         x = x[:, -1, :]
         x = self.classifier(x)
@@ -106,6 +96,21 @@ class MyModule(nn.Module):
         x = torch.relu(x)
 
         x = x[:, -1, :]
+        x = self.classifier(x)
+        return x
+
+    def forward(self, x, t):
+        x = self.feature(x)
+
+        x = x.permute(1, 0, 2, 3)
+        x = torch.unsqueeze(x, 0)
+
+        x = torch.relu(self.conv3d_1(x))
+        x = torch.relu(self.conv3d_2(x))
+
+        x = self.avg_pool_3d(x)
+        x = torch.flatten(x, 1)
+
         x = self.classifier(x)
         return x
 
@@ -141,8 +146,7 @@ def main():
     model = MyModule(num_classes=3).to(device)
 
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.005)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+    optimizer = torch.optim.Adam(params, lr=0.001, weight_decay=0.005)
 
     if os.path.exists(MODEL_FILE):
         model.load_state_dict(torch.load(MODEL_FILE))
@@ -160,7 +164,6 @@ def main():
 
             optimizer.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), max_norm=10, norm_type=2)
             optimizer.step()
 
             pred = torch.argmax(pred, 1)
@@ -174,7 +177,6 @@ def main():
                   end='\r', flush=True)
 
         torch.save(model.state_dict(), MODEL_FILE)
-        lr_scheduler.step()
         print()
 
 
